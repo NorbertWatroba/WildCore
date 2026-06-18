@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.wildcore.ui.JournalScreen
-import com.example.wildcore.ui.theme.WildCoreTheme
+import com.wildcore.ui.theme.WildCoreTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

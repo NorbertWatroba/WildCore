@@ -1,4 +1,4 @@
-package com.example.wildcore.ui.theme
+package com.wildcore.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

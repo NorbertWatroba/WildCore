@@ -1,4 +1,4 @@
-package com.example.wildcore.ui.theme
+package com.wildcore.ui.theme
 
 import android.app.Activity
 import android.os.Build
