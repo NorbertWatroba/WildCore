@@ -29,6 +29,11 @@ class FallDetector(
         sensorManager.unregisterListener(this)
     }
 
+    fun reset() {
+        isAlarmTriggered = false
+        isFreeFalling = false
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]

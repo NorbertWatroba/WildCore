@@ -90,7 +90,15 @@ fun FallWarningScreen(
             modifier = Modifier.padding(32.dp)
         ) {
             Text(
-                text = "⚠️ WYKRYTO UPADEK ⚠️",
+                text = "⚠️",
+                fontSize = 56.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "WYKRYTO UPADEK",
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,

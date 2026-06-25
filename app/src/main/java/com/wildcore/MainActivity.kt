@@ -53,9 +53,13 @@ class MainActivity : ComponentActivity() {
                             FallWarningScreen(
                                 countdown = countdown,
                                 onCountdownChange = { countdown = it },
-                                onCancel = { isFallWarningVisible = false },
+                                onCancel = {
+                                    isFallWarningVisible = false
+                                    fallDetector.reset()
+                                },
                                 onSendNow = {
                                     isFallWarningVisible = false
+                                    fallDetector.reset()
 
                                     // Pobieramy numer i odpalamy bezpośrednio istniejącą funkcję globalną
                                     val sharedPreferences = context.getSharedPreferences("WildCorePrefs", Context.MODE_PRIVATE)

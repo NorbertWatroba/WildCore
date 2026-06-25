@@ -126,7 +126,7 @@ fun JournalScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Opcje menu (Add Spot, Saved Spots, Tools, Weather, Alarm...)
+                // Opcja 1: Dodaj punkt
                 NavigationDrawerItem(
                     label = { Text("🌲 Dodaj nowy punkt") },
                     selected = currentScreen == WildCoreScreen.ADD_SPOT,
@@ -137,6 +137,7 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
+                // Opcja 2: Zobacz zapisane punkty
                 NavigationDrawerItem(
                     label = { Text("🗂️ Zobacz zapisane punkty") },
                     selected = currentScreen == WildCoreScreen.SAVED_SPOTS,
@@ -147,6 +148,7 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
+                // Opcja 3: Narzędzia
                 NavigationDrawerItem(
                     label = { Text("🧭 Narzędzia (Kompas)") },
                     selected = currentScreen == WildCoreScreen.Tools,
@@ -157,6 +159,7 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
+                // Opcja 4: Prognoza Pogody
                 NavigationDrawerItem(
                     label = { Text("⛅ Prognoza Pogody") },
                     selected = currentScreen == WildCoreScreen.WEATHER,
@@ -167,6 +170,7 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
+                // Opcja 5: Ustawienia numeru alarmowego
                 NavigationDrawerItem(
                     label = { Text("🚨 Ustawienia SOS") },
                     selected = currentScreen == WildCoreScreen.ALARM,
@@ -176,21 +180,24 @@ fun JournalScreen(
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
+
+
             }
         }
     ) {
+        // Tutaj znajduje się reszta aplikacji, która automatycznie się PRZYCIEMNI, gdy drawer się otworzy
         Scaffold(
             topBar = {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp) // Delikatnie podniesiony pasek dla lepszego balansu wizualnego
+                        .height(48.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
@@ -260,7 +267,6 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) {
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
-    // Centrowanie mapy na użytkowniku przy otwarciu
     LaunchedEffect(Unit) {
         if (hasLocationPermission) {
             val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -343,7 +349,7 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) {
                     snippet = spot.description
                 ) {
                     Box(
-                        modifier = Modifier
+                        modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
                             .size(36.dp)
                             .background(
                                 color = MaterialTheme.colorScheme.surface,
@@ -439,9 +445,29 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val categories = listOf("💧 Woda", "⛺ Schron", "🍓 Jedzenie", "⚠️ Zagrożenie")
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
-    // 🔥 ZMIANA: Zaczynamy z pustymi polami tekstowymi
-    var latitudeInput by remember { mutableStateOf("") }
-    var longitudeInput by remember { mutableStateOf("") }
+    // Domyślne wartości (Gdańsk) zostawiamy jako "fallback" na wypadek braku GPS
+    var latitudeInput by remember { mutableStateOf("54.3520") }
+    var longitudeInput by remember { mutableStateOf("18.6460") }
+
+    // --- NOWY BLOK: Pobieranie aktualnej pozycji przy starcie ekranu ---
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                CancellationTokenSource().token
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    // Aktualizujemy inputy prawdziwą lokalizacją, co automatycznie przesunie mapę
+                    latitudeInput = String.format(Locale.US, "%.5f", location.latitude)
+                    longitudeInput = String.format(Locale.US, "%.5f", location.longitude)
+                }
+            }
+        }
+    }
+    // ------------------------------------------------------------------
 
     val latDouble = latitudeInput.toDoubleOrNull()
     val lonDouble = longitudeInput.toDoubleOrNull()
@@ -451,14 +477,16 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val showLonError = longitudeInput.isNotEmpty() && !isLonValid
     val isFormValid = title.isNotBlank() && isLatValid && isLonValid
 
-    // ZMIANA: Szeroki widok startowy (np. na Polskę) zamiast domyślnego Gdańska
+    // 1. Stan kamery i pozycja startowa mapy
+    val defaultLatLng = LatLng(54.3520, 18.6460)
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(52.0693, 19.4803), 6f)
+        position = CameraPosition.fromLatLngZoom(defaultLatLng, 12f)
     }
 
-    val markerState = rememberMarkerState()
+    // 2. Stan pozycji samej pinezki (Markera)
+    val markerState = rememberMarkerState(position = defaultLatLng)
 
-    // Automatyczna synchronizacja: Klawiatura/GPS/Kliknięcie -> Mapa
+    // 3. Automatyczna synchronizacja: Klawiatura -> Mapa
     LaunchedEffect(latDouble, lonDouble) {
         if (isLatValid && isLonValid && latDouble != null && lonDouble != null) {
             val newTarget = LatLng(latDouble, lonDouble)
@@ -621,7 +649,6 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                         lon = lonDouble ?: 0.0,
                         category = selectedCategory
                     )
-                    // Resetowanie całego formularza do stanu czystego
                     title = ""
                     description = ""
                     latitudeInput = ""  // 🔥 Czyszczenie po zapisie
