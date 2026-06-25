@@ -125,10 +125,24 @@ fun triggerEmergencyAlarm(context: Context, phoneNumber: String) {
 private fun sendSms(context: Context, phoneNumber: String, message: String) {
     try {
         val smsManager: SmsManager = context.getSystemService(SmsManager::class.java)
-        smsManager.sendTextMessage(phoneNumber, null, message, null, null)
-        Toast.makeText(context, "Wiadomość SOS wysłana poprawnie!", Toast.LENGTH_SHORT).show()
+
+        // Zabezpieczenie na wypadek braku numeru kierunkowego (opcjonalne, ale przydatne w Polsce)
+        val formattedNumber = if (!phoneNumber.startsWith("+")) "+48$phoneNumber" else phoneNumber
+
+        // Dzielimy wiadomość na części (jeśli przekracza limit znaków)
+        val parts = smsManager.divideMessage(message)
+
+        if (parts.size > 1) {
+            // Wysłanie długiej, wieloczęściowej wiadomości
+            smsManager.sendMultipartTextMessage(formattedNumber, null, parts, null, null)
+        } else {
+            // Wysłanie standardowej, krótkiej wiadomości
+            smsManager.sendTextMessage(formattedNumber, null, message, null, null)
+        }
+
+        Toast.makeText(context, "Sygnał SOS przekazany do wysłania!", Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         e.printStackTrace()
-        Toast.makeText(context, "Błąd! Nie udało się wysłać SMS.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Krytyczny błąd! Nie udało się wysłać SOS.", Toast.LENGTH_LONG).show()
     }
 }
