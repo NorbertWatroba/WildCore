@@ -49,6 +49,7 @@ enum class WildCoreScreen(val title: String) {
     ADD_SPOT("🌲 Nowy Punkt GPS"),
     SAVED_SPOTS("🗂️ Dziennik Terenowy"),
     Tools("🧭 Narzędzia i Nawigacja"),
+    WEATHER("⛅ Prognoza Pogody"),
     ALARM("🚨 Ustawienia SOS")
 }
 
@@ -116,7 +117,18 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 4: Ustawienia numeru alarmowego
+                // Opcja 4: Prognoza Pogody
+                NavigationDrawerItem(
+                    label = { Text("⛅ Prognoza Pogody") },
+                    selected = currentScreen == WildCoreScreen.WEATHER,
+                    onClick = {
+                        currentScreen = WildCoreScreen.WEATHER
+                        scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+
+                // Opcja 5: Ustawienia numeru alarmowego
                 NavigationDrawerItem(
                     label = { Text("🚨 Ustawienia SOS") },
                     selected = currentScreen == WildCoreScreen.ALARM,
@@ -174,6 +186,7 @@ fun JournalScreen(
                     WildCoreScreen.ADD_SPOT -> AddSpotForm(viewModel = viewModel)
                     WildCoreScreen.SAVED_SPOTS -> SavedSpotsList(viewModel = viewModel)
                     WildCoreScreen.Tools -> ToolsScreen()
+                    WildCoreScreen.WEATHER -> WeatherScreen()
                     WildCoreScreen.ALARM -> AlarmSettingsScreen()
                 }
             }
