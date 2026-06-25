@@ -41,8 +41,8 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.MapProperties
-
 import java.util.Locale
+import com.wildcore.BuildConfig
 
 
 enum class WildCoreScreen(val title: String) {
@@ -420,8 +420,9 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
+
                 googleMapOptionsFactory = {
-                    GoogleMapOptions().mapId("TU DODAC ID MAPY")
+                    GoogleMapOptions().mapId(BuildConfig.MAP_ID)
                 },
 
                 onMapClick = { latLng ->

@@ -27,6 +27,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        buildConfigField(
+            "String",
+            "MAP_ID",
+            "\"${localProperties.getProperty("MAP_ID", "")}\""
+        )
     }
 
     buildTypes {
@@ -44,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
