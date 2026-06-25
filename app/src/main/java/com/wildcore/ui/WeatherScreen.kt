@@ -117,7 +117,7 @@ fun WeatherCard(weather: DailyWeather) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { expanded = !expanded }
-            // Płynna animacja rozwijania kafelka
+            // Płynna animacja rozwijania kafelka (teraz obsłuży też pojawienie się dodatkowego tekstu!)
             .animateContentSize(
                 animationSpec = tween(
                     durationMillis = 300,
@@ -133,14 +133,15 @@ fun WeatherCard(weather: DailyWeather) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Sekcja Tekstowa po lewej (Dzięki weight(1f) dopasuje się do ekranu i nie wypchnie temperatury)
+                // Sekcja Tekstowa po lewej
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(text = weather.date, fontWeight = FontWeight.Bold)
                     Text(
                         text = getWeatherDescription(weather.weatherCode),
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis // W razie bardzo długiego tekstu doda "..." na małym ekranie
+                        // DYNAMICZNA ZMIANA: 1 linia gdy zamknięte, brak limitu gdy otwarte
+                        maxLines = if (expanded) Int.MAX_VALUE else 1,
+                        overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
                     )
                 }
 
