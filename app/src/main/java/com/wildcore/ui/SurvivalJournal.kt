@@ -22,6 +22,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.scale
+import kotlinx.coroutines.delay
+import com.wildcore.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -65,32 +72,61 @@ enum class WildCoreScreen(val title: String) {
 fun JournalScreen(
     viewModel: SurvivalViewModel = koinViewModel()
 ) {
-    var currentScreen by rememberSaveable { mutableStateOf(WildCoreScreen.ADD_SPOT) }
+    // 🔥 NOWOŚĆ: Stan kontrolujący, czy aplikacja się ładuje
+    var isLoading by rememberSaveable { mutableStateOf(true) }
 
-    // Obsługa stanu wysuwanego menu (Drawer) i korutyn do jego otwierania/zamykania
+    // 🔥 NOWOŚĆ: Efekt, który symuluje ładowanie (np. 2000 ms = 2 sekundy)
+    LaunchedEffect(Unit) {
+        delay(2000) // Tutaj możesz też poczekać na faktyczne załadowanie danych z bazy/baterii
+        isLoading = false
+    }
+
+    // 🔥 NOWOŚĆ: Instrukcja warunkowa decydująca co wyświetlić
+    if (isLoading) {
+        LoadingScreen()
+        return
+    }
+
+    var currentScreen by rememberSaveable { mutableStateOf(WildCoreScreen.ADD_SPOT) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // GŁÓWNY KONTENER: Komponent wysuwanego menu z automatycznym przyciemnianiem tła
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(300.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "🧭 Nawigacja WildCore",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                // 🔥 NOWOŚĆ: Logo WildCore w nagłówku menu bocznego
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "WildCore Logo",
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(12.dp)) // Estetyczne zaokrąglenie rogów logo
+                    )
+                    Text(
+                        text = "WildCore",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
 
+                Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Opcja 1: Dodaj punkt
+                // Opcje menu (Add Spot, Saved Spots, Tools, Weather, Alarm...)
                 NavigationDrawerItem(
                     label = { Text("🌲 Dodaj nowy punkt") },
                     selected = currentScreen == WildCoreScreen.ADD_SPOT,
@@ -101,7 +137,6 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 2: Zobacz zapisane punkty
                 NavigationDrawerItem(
                     label = { Text("🗂️ Zobacz zapisane punkty") },
                     selected = currentScreen == WildCoreScreen.SAVED_SPOTS,
@@ -112,7 +147,6 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 3: Narzędzia
                 NavigationDrawerItem(
                     label = { Text("🧭 Narzędzia (Kompas)") },
                     selected = currentScreen == WildCoreScreen.Tools,
@@ -123,7 +157,6 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 4: Prognoza Pogody
                 NavigationDrawerItem(
                     label = { Text("⛅ Prognoza Pogody") },
                     selected = currentScreen == WildCoreScreen.WEATHER,
@@ -134,7 +167,6 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 5: Ustawienia numeru alarmowego
                 NavigationDrawerItem(
                     label = { Text("🚨 Ustawienia SOS") },
                     selected = currentScreen == WildCoreScreen.ALARM,
@@ -144,24 +176,21 @@ fun JournalScreen(
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
-
-
             }
         }
     ) {
-        // Tutaj znajduje się reszta aplikacji, która automatycznie się PRZYCIEMNI, gdy drawer się otworzy
         Scaffold(
             topBar = {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(56.dp) // Delikatnie podniesiony pasek dla lepszego balansu wizualnego
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 4.dp),
+                            .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
@@ -173,11 +202,23 @@ fun JournalScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // 🔥 NOWOŚĆ: Miniaturka logo na pasku górnym obok nazwy podstrony
+                        Image(
+                            painter = painterResource(id = R.drawable.logo),
+                            contentDescription = "Mini Logo",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Text(
                             text = currentScreen.title,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -203,14 +244,13 @@ fun JournalScreen(
 // --- PODSTRONA 1: EKRAN NARZĘDZI (CZYSTY KOMPAS) ---
 @SuppressLint("MissingPermission")
 @Composable
-fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Przyjmujemy viewModel
-    // NOWOŚĆ: Pobieranie zapisanych punktów w czasie rzeczywistym
+fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) {
+    // Pobieranie zapisanych punktów w czasie rzeczywistym
     val spots by viewModel.survivalSpots.collectAsState()
 
     val context = LocalContext.current
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
 
-    // (reszta istniejącego kodu czujników kompasu pozostaje bez zmian...)
     var azimuth by remember { mutableStateOf(0f) }
     val gravity = remember { FloatArray(3) }
     val geomagnetic = remember { FloatArray(3) }
@@ -220,6 +260,7 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Prz
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
+    // Centrowanie mapy na użytkowniku przy otwarciu
     LaunchedEffect(Unit) {
         if (hasLocationPermission) {
             val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -232,7 +273,46 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Prz
         }
     }
 
-    // (Blok DisposableEffect dla rejestracji sensorów bez zmian...)
+    // 🔥 URUCHOMIENIE SENSORÓW (Przywrócony brakujący blok kodu)
+    DisposableEffect(Unit) {
+        val sensorEventListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        System.arraycopy(event.values, 0, gravity, 0, event.values.size)
+                        calculateAzimuth()
+                    }
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        System.arraycopy(event.values, 0, geomagnetic, 0, event.values.size)
+                        calculateAzimuth()
+                    }
+                }
+            }
+
+            private fun calculateAzimuth() {
+                val r = FloatArray(9)
+                val i = FloatArray(9)
+                if (SensorManager.getRotationMatrix(r, i, gravity, geomagnetic)) {
+                    val orientation = FloatArray(3)
+                    SensorManager.getOrientation(r, orientation)
+                    val azimuthDeg = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    azimuth = (azimuthDeg + 360) % 360
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+
+        sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        sensorManager.registerListener(sensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_UI)
+
+        onDispose {
+            sensorManager.unregisterListener(sensorEventListener)
+        }
+    }
 
     val directionText = when (azimuth) {
         in 337.5..360.0, in 0.0..22.5 -> "N (Północ)"
@@ -263,7 +343,7 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Prz
                     snippet = spot.description
                 ) {
                     Box(
-                        modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                        modifier = Modifier
                             .size(36.dp)
                             .background(
                                 color = MaterialTheme.colorScheme.surface,
@@ -346,7 +426,7 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Prz
 @SuppressLint("MissingPermission")
 @Composable
 fun AddSpotForm(viewModel: SurvivalViewModel) {
-    val context = LocalContext.current // POTRZEBNE DO LOKALIZACJI
+    val context = LocalContext.current
 
     val spots by viewModel.survivalSpots.collectAsState()
 
@@ -359,29 +439,9 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val categories = listOf("💧 Woda", "⛺ Schron", "🍓 Jedzenie", "⚠️ Zagrożenie")
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
-    // Domyślne wartości (Gdańsk) zostawiamy jako "fallback" na wypadek braku GPS
-    var latitudeInput by remember { mutableStateOf("54.3520") }
-    var longitudeInput by remember { mutableStateOf("18.6460") }
-
-    // --- NOWY BLOK: Pobieranie aktualnej pozycji przy starcie ekranu ---
-    LaunchedEffect(Unit) {
-        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (hasPermission) {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                CancellationTokenSource().token
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    // Aktualizujemy inputy prawdziwą lokalizacją, co automatycznie przesunie mapę
-                    latitudeInput = String.format(Locale.US, "%.5f", location.latitude)
-                    longitudeInput = String.format(Locale.US, "%.5f", location.longitude)
-                }
-            }
-        }
-    }
-    // ------------------------------------------------------------------
+    // 🔥 ZMIANA: Zaczynamy z pustymi polami tekstowymi
+    var latitudeInput by remember { mutableStateOf("") }
+    var longitudeInput by remember { mutableStateOf("") }
 
     val latDouble = latitudeInput.toDoubleOrNull()
     val lonDouble = longitudeInput.toDoubleOrNull()
@@ -391,21 +451,35 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val showLonError = longitudeInput.isNotEmpty() && !isLonValid
     val isFormValid = title.isNotBlank() && isLatValid && isLonValid
 
-    // 1. Stan kamery i pozycja startowa mapy
-    val defaultLatLng = LatLng(54.3520, 18.6460)
+    // ZMIANA: Szeroki widok startowy (np. na Polskę) zamiast domyślnego Gdańska
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultLatLng, 12f)
+        position = CameraPosition.fromLatLngZoom(LatLng(52.0693, 19.4803), 6f)
     }
 
-    // 2. Stan pozycji samej pinezki (Markera)
-    val markerState = rememberMarkerState(position = defaultLatLng)
+    val markerState = rememberMarkerState()
 
-    // 3. Automatyczna synchronizacja: Klawiatura -> Mapa
+    // Automatyczna synchronizacja: Klawiatura/GPS/Kliknięcie -> Mapa
     LaunchedEffect(latDouble, lonDouble) {
         if (isLatValid && isLonValid && latDouble != null && lonDouble != null) {
             val newTarget = LatLng(latDouble, lonDouble)
             markerState.position = newTarget
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(newTarget, cameraPositionState.position.zoom)
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(newTarget, 15f)
+        }
+    }
+
+    // Pobieranie aktualnej pozycji przy starcie ekranu (nadpisze pustkę, jeśli GPS zadziała)
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                CancellationTokenSource().token
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    latitudeInput = String.format(Locale.US, "%.5f", location.latitude)
+                    longitudeInput = String.format(Locale.US, "%.5f", location.longitude)
+                }
+            }
         }
     }
 
@@ -449,7 +523,6 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
             }
         }
 
-        // --- SEKCJA INTERAKTYWNEJ MAPY GOOGLE ---
         Text(text = "🗺️ Wybierz lokalizację na mapie (kliknij, aby postawić pinezkę):", style = MaterialTheme.typography.titleSmall)
 
         Card(
@@ -470,13 +543,15 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                     longitudeInput = String.format(Locale.US, "%.5f", latLng.longitude)
                 }
             ) {
-                // 1. Istniejący Marker aktywnie tworzonego/klikanego punktu
-                Marker(
-                    state = markerState,
-                    title = if (title.isBlank()) "Nowy punkt krytyczny" else title
-                )
+                // 🔥 ZMIANA: Rysujemy marker aktywnego punktu TYLKO wtedy, gdy wpisano/pobrano poprawne dane
+                if (isLatValid && isLonValid && latDouble != null && lonDouble != null) {
+                    Marker(
+                        state = markerState,
+                        title = if (title.isBlank()) "Nowy punkt krytyczny" else title
+                    )
+                }
 
-                // 2. Wyświetlanie pozostałych punktów z unikalnymi emotkami w tle
+                // Wyświetlanie pozostałych punktów z unikalnymi emotkami w tle
                 spots.forEach { spot ->
                     val emoji = spot.category.substringBefore(" ")
 
@@ -487,7 +562,7 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                         snippet = spot.description
                     ) {
                         Box(
-                            modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                            modifier = Modifier
                                 .size(36.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
@@ -546,8 +621,11 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                         lon = lonDouble ?: 0.0,
                         category = selectedCategory
                     )
+                    // Resetowanie całego formularza do stanu czystego
                     title = ""
                     description = ""
+                    latitudeInput = ""  // 🔥 Czyszczenie po zapisie
+                    longitudeInput = "" // 🔥 Czyszczenie po zapisie
                 }
             },
             enabled = isFormValid,
@@ -608,6 +686,51 @@ fun SavedSpotsList(viewModel: SurvivalViewModel) {
                     }
                 }
             }
+        }
+    }
+}
+@Composable
+fun LoadingScreen() {
+    // Tworzymy nieskończoną animację (transition)
+    val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
+
+    // Animujemy skale od 0.9 (lekkie pomniejszenie) do 1.1 (lekkie powiększenie)
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse // Po powiększeniu wraca płynnie do pomniejszenia
+        ),
+        label = "LogoScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF2B3629)), // Taktyczna ciemna zieleń jako tło ładowania
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Pulsujące Logo
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Ładowanie WildCore",
+                modifier = Modifier
+                    .size(140.dp)
+                    .scale(scale) // 🔥 Tutaj aplikujemy animację skali
+                    .clip(RoundedCornerShape(28.dp))
+            )
+
+            // Prosty kręcący się pasek postępu w kolorze Khaki
+            CircularProgressIndicator(
+                color = Color(0xFFC2B280),
+                trackColor = Color(0xFF485B45),
+                modifier = Modifier.size(36.dp)
+            )
         }
     }
 }
