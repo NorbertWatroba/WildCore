@@ -163,22 +163,22 @@ fun JournalScreen(
     }
 }
 
-// --- PODSTRONA 1: EKRAN NARZĘDZI (KOMPAS + BAROMETR) ---
+// --- PODSTRONA 1: EKRAN NARZĘDZI (CZYSTY KOMPAS) ---
 @Composable
 fun ToolsScreen() {
     val context = LocalContext.current
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
 
+    // Stan dla kompasu
     var azimuth by remember { mutableStateOf(0f) }
-    var pressure by remember { mutableStateOf(1013.25f) }
-    var altitude by remember { mutableStateOf(0f) }
-    var hasBarometer by remember { mutableStateOf(true) }
 
+    // Tablice pomocnicze do obliczeń (akcelerometr + magnetometr)
     val gravity = remember { FloatArray(3) }
     val geomagnetic = remember { FloatArray(3) }
 
     val cameraPositionState = rememberCameraPositionState()
 
+    // Rejestracja wyłącznie potrzebnych czujników ruchu i pola magnetycznego
     DisposableEffect(Unit) {
         val sensorEventListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -190,10 +190,6 @@ fun ToolsScreen() {
                     Sensor.TYPE_MAGNETIC_FIELD -> {
                         System.arraycopy(event.values, 0, geomagnetic, 0, event.values.size)
                         calculateAzimuth()
-                    }
-                    Sensor.TYPE_PRESSURE -> {
-                        pressure = event.values[0]
-                        altitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure)
                     }
                 }
             }
@@ -214,21 +210,17 @@ fun ToolsScreen() {
 
         val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        val barometer = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-
-        if (barometer == null) hasBarometer = false
 
         sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI)
         sensorManager.registerListener(sensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_UI)
-        barometer?.let {
-            sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_UI)
-        }
 
+        // Sprzątanie po wyjściu z zakładki
         onDispose {
             sensorManager.unregisterListener(sensorEventListener)
         }
     }
 
+    // Wyznaczanie kierunku świata
     val directionText = when (azimuth) {
         in 337.5..360.0, in 0.0..22.5 -> "N (Północ)"
         in 22.5..67.5 -> "NE (Pn-Wsch)"
@@ -240,19 +232,14 @@ fun ToolsScreen() {
         else -> "NW (Pn-Zach)"
     }
 
-    val weatherPrediction = when {
-        !hasBarometer -> "Brak czujnika barometru"
-        pressure < 1000f -> "Niskie ciśnienie – ryzyko opadów! ⚠️"
-        pressure in 1000f..1020f -> "Stabilne ciśnienie – zmienna pogoda 🌤️"
-        else -> "Wysokie ciśnienie – stabilna pogoda ☀️"
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
+        // Tło: Mapa Google
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         )
 
+        // Nakładka: Wyśrodkowany, czytelny kompas
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -263,99 +250,49 @@ fun ToolsScreen() {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
                 ),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = directionText,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = String.format(Locale.US, "%.0f°", azimuth),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(70.dp)
-                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Navigation,
-                                contentDescription = "Igła kompasu",
-                                tint = Color.Red,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .rotate(-azimuth)
-                            )
-                        }
-                    }
-
-                    // Pionowa linia oddzielająca (zastępuje VerticalDivider dla pełnej kompatybilności M3)
-                    Box(
-                        modifier = Modifier
-                            .height(100.dp)
-                            .width(1.dp)
-                            .padding(horizontal = 8.dp)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                    Text(
+                        text = directionText,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
 
-                    Column(
-                        modifier = Modifier.weight(1f).padding(start = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(text = "🏔️ WYSOKOŚĆ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                        Text(
-                            text = if (hasBarometer) String.format(Locale.US, "%.1f m", altitude) else "Brak danych",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "📉 CIŚNIENIE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                        Text(
-                            text = if (hasBarometer) String.format(Locale.US, "%.2f hPa", pressure) else "Brak danych",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
+                    Text(
+                        text = String.format(Locale.US, "%.0f°", azimuth),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Black
+                    )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (pressure < 1000f && hasBarometer) {
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
-                    } else {
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Powiększona i wyśrodkowana fizyczna igła kompasu
+                    Box(
+                        modifier = Modifier
+                            .size(130.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Navigation,
+                            contentDescription = "Igła kompasu",
+                            tint = Color.Red,
+                            modifier = Modifier
+                                .size(65.dp)
+                                .rotate(-azimuth) // dynamiczny obrót igły
+                        )
                     }
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.CompassCalibration, contentDescription = "Status")
-                    Text(text = weatherPrediction, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
