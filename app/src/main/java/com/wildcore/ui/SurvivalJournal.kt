@@ -1,19 +1,35 @@
 package com.wildcore.ui
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CompassCalibration
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Navigation
 import com.wildcore.data.SurvivalSpot
 import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.launch
@@ -32,6 +48,7 @@ import java.util.Locale
 enum class WildCoreScreen(val title: String) {
     ADD_SPOT("🌲 Nowy Punkt GPS"),
     SAVED_SPOTS("🗂️ Dziennik Terenowy"),
+    Tools("🧭 Narzędzia i Nawigacja"),
     ALARM("🚨 Ustawienia SOS")
 }
 
@@ -40,7 +57,7 @@ enum class WildCoreScreen(val title: String) {
 fun JournalScreen(
     viewModel: SurvivalViewModel = koinViewModel()
 ) {
-    var currentScreen by remember { mutableStateOf(WildCoreScreen.ADD_SPOT) }
+    var currentScreen by rememberSaveable { mutableStateOf(WildCoreScreen.ADD_SPOT) }
 
     // Obsługa stanu wysuwanego menu (Drawer) i korutyn do jego otwierania/zamykania
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -50,13 +67,11 @@ fun JournalScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            // Wygląd wnętrza naszego pięknego menu
             ModalDrawerSheet(
-                modifier = Modifier.width(300.dp) // Szerokość wysuwanego paska
+                modifier = Modifier.width(300.dp)
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Nagłówek w menu
                 Text(
                     text = "🧭 Nawigacja WildCore",
                     style = MaterialTheme.typography.titleLarge,
@@ -73,7 +88,6 @@ fun JournalScreen(
                     selected = currentScreen == WildCoreScreen.ADD_SPOT,
                     onClick = {
                         currentScreen = WildCoreScreen.ADD_SPOT
-                        // Zamykamy menu z powrotem w korutynie
                         scope.launch { drawerState.close() }
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -90,7 +104,19 @@ fun JournalScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
-                // Opcja 3: Ustawienia numeru alarmowego
+                // Opcja 3: Narzędzia
+                NavigationDrawerItem(
+                    label = { Text("🧭 Narzędzia (Kompas)") },
+                    selected = currentScreen == WildCoreScreen.Tools,
+                    icon = { Icon(Icons.Default.Explore, contentDescription = "Narzędzia") },
+                    onClick = {
+                        currentScreen = WildCoreScreen.Tools
+                        scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+
+                // Opcja 4: Ustawienia numeru alarmowego
                 NavigationDrawerItem(
                     label = { Text("🚨 Ustawienia SOS") },
                     selected = currentScreen == WildCoreScreen.ALARM,
@@ -100,26 +126,26 @@ fun JournalScreen(
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
+
+
             }
         }
     ) {
         // Tutaj znajduje się reszta aplikacji, która automatycznie się PRZYCIEMNI, gdy drawer się otworzy
         Scaffold(
             topBar = {
-                // Używamy zwykłego Surface, aby mieć 100% kontroli nad rozmiarem
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp) // <--- TUTAJ ustawiasz idealną, małą wysokość paska!
+                        .height(48.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically // Środkujemy elementy w pionie
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Nasz hamburger
                         IconButton(onClick = {
                             scope.launch { drawerState.open() }
                         }) {
@@ -131,7 +157,6 @@ fun JournalScreen(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Tytuł podstrony (czcionka titleMedium świetnie pasuje do małego paska)
                         Text(
                             text = currentScreen.title,
                             style = MaterialTheme.typography.titleMedium
@@ -148,6 +173,7 @@ fun JournalScreen(
                 when (currentScreen) {
                     WildCoreScreen.ADD_SPOT -> AddSpotForm(viewModel = viewModel)
                     WildCoreScreen.SAVED_SPOTS -> SavedSpotsList(viewModel = viewModel)
+                    WildCoreScreen.Tools -> ToolsScreen()
                     WildCoreScreen.ALARM -> AlarmSettingsScreen()
                 }
             }
@@ -155,7 +181,144 @@ fun JournalScreen(
     }
 }
 
-// --- PODSTRONA 1: PEŁNOEKRANOWY FORMULARZ (Bez zmian) ---
+// --- PODSTRONA 1: EKRAN NARZĘDZI (CZYSTY KOMPAS) ---
+@Composable
+fun ToolsScreen() {
+    val context = LocalContext.current
+    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+
+    // Stan dla kompasu
+    var azimuth by remember { mutableStateOf(0f) }
+
+    // Tablice pomocnicze do obliczeń (akcelerometr + magnetometr)
+    val gravity = remember { FloatArray(3) }
+    val geomagnetic = remember { FloatArray(3) }
+
+    val cameraPositionState = rememberCameraPositionState()
+
+    // Rejestracja wyłącznie potrzebnych czujników ruchu i pola magnetycznego
+    DisposableEffect(Unit) {
+        val sensorEventListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        System.arraycopy(event.values, 0, gravity, 0, event.values.size)
+                        calculateAzimuth()
+                    }
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        System.arraycopy(event.values, 0, geomagnetic, 0, event.values.size)
+                        calculateAzimuth()
+                    }
+                }
+            }
+
+            private fun calculateAzimuth() {
+                val r = FloatArray(9)
+                val i = FloatArray(9)
+                if (SensorManager.getRotationMatrix(r, i, gravity, geomagnetic)) {
+                    val orientation = FloatArray(3)
+                    SensorManager.getOrientation(r, orientation)
+                    val azimuthDeg = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    azimuth = (azimuthDeg + 360) % 360
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+
+        sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        sensorManager.registerListener(sensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_UI)
+
+        // Sprzątanie po wyjściu z zakładki
+        onDispose {
+            sensorManager.unregisterListener(sensorEventListener)
+        }
+    }
+
+    // Wyznaczanie kierunku świata
+    val directionText = when (azimuth) {
+        in 337.5..360.0, in 0.0..22.5 -> "N (Północ)"
+        in 22.5..67.5 -> "NE (Pn-Wsch)"
+        in 67.5..112.5 -> "E (Wschód)"
+        in 112.5..157.5 -> "SE (Pd-Wsch)"
+        in 157.5..202.5 -> "S (Południe)"
+        in 202.5..247.5 -> "SW (Pd-Zach)"
+        in 247.5..292.5 -> "W (Zachód)"
+        else -> "NW (Pn-Zach)"
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Tło: Mapa Google
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState
+        )
+
+        // Nakładka: Wyśrodkowany, czytelny kompas
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                ),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = directionText,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Text(
+                        text = String.format(Locale.US, "%.0f°", azimuth),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Black
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Powiększona i wyśrodkowana fizyczna igła kompasu
+                    Box(
+                        modifier = Modifier
+                            .size(130.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Navigation,
+                            contentDescription = "Igła kompasu",
+                            tint = Color.Red,
+                            modifier = Modifier
+                                .size(65.dp)
+                                .rotate(-azimuth) // dynamiczny obrót igły
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// --- PODSTRONA 2: PEŁNOEKRANOWY FORMULARZ ---
 @Composable
 fun AddSpotForm(viewModel: SurvivalViewModel) {
     var title by remember { mutableStateOf("") }
@@ -163,7 +326,6 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val categories = listOf("💧 Woda", "⛺ Schron", "🍓 Jedzenie", "⚠️ Zagrożenie")
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
-    // Początkowe współrzędne (np. Gdańsk)
     var latitudeInput by remember { mutableStateOf("54.3520") }
     var longitudeInput by remember { mutableStateOf("18.6460") }
 
@@ -240,14 +402,12 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp), // Zgrabna wysokość, żeby zmieścić resztę pól na ekranie
+                .height(220.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
-
-                // 🔥 PRAWIDŁOWE MIEJSCE NA ID MAPY W COMPOSE:
                 googleMapOptionsFactory = {
                     GoogleMapOptions().mapId("TU DODAC ID MAPY")
                 },
@@ -317,7 +477,7 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     }
 }
 
-// --- PODSTRONA 2: PEŁNOEKRANOWA LISTA (Bez zmian) ---
+// --- PODSTRONA 3: PEŁNOEKRANOWA LISTA ---
 @Composable
 fun SavedSpotsList(viewModel: SurvivalViewModel) {
     val spots by viewModel.survivalSpots.collectAsState()
