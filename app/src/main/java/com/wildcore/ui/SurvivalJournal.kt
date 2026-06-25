@@ -31,7 +31,8 @@ import java.util.Locale
 
 enum class WildCoreScreen(val title: String) {
     ADD_SPOT("🌲 Nowy Punkt GPS"),
-    SAVED_SPOTS("🗂️ Dziennik Terenowy")
+    SAVED_SPOTS("🗂️ Dziennik Terenowy"),
+    ALARM("🚨 Ustawienia SOS")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,6 +89,17 @@ fun JournalScreen(
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
+
+                // Opcja 3: Ustawienia numeru alarmowego
+                NavigationDrawerItem(
+                    label = { Text("🚨 Ustawienia SOS") },
+                    selected = currentScreen == WildCoreScreen.ALARM,
+                    onClick = {
+                        currentScreen = WildCoreScreen.ALARM
+                        scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
             }
         }
     ) {
@@ -136,6 +148,7 @@ fun JournalScreen(
                 when (currentScreen) {
                     WildCoreScreen.ADD_SPOT -> AddSpotForm(viewModel = viewModel)
                     WildCoreScreen.SAVED_SPOTS -> SavedSpotsList(viewModel = viewModel)
+                    WildCoreScreen.ALARM -> AlarmSettingsScreen()
                 }
             }
         }
