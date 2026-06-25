@@ -109,7 +109,6 @@ fun JournalScreen(
                 NavigationDrawerItem(
                     label = { Text("🧭 Narzędzia (Kompas)") },
                     selected = currentScreen == WildCoreScreen.Tools,
-                    icon = { Icon(Icons.Default.Explore, contentDescription = "Narzędzia") },
                     onClick = {
                         currentScreen = WildCoreScreen.Tools
                         scope.launch { drawerState.close() }
