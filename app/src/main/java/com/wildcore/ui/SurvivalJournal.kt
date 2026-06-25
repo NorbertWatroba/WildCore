@@ -254,29 +254,31 @@ fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Prz
         ) {
             // Pętla nanosząca wszystkie zapisane wcześniej pinezki
             spots.forEach { spot ->
-                val emoji = spot.category.substringBefore(" ")
+                key(spot.id) {
+                    val emoji = spot.category.substringBefore(" ")
 
-                com.google.maps.android.compose.MarkerComposable(
-                    keys = arrayOf(spot.id),
-                    state = rememberMarkerState(position = LatLng(spot.latitude, spot.longitude)),
-                    title = spot.title,
-                    snippet = spot.description
-                ) {
-                    Box(
-                        modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
-                            .size(36.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = CircleShape
-                            )
-                            .border(
-                                width = 2.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
+                    com.google.maps.android.compose.MarkerComposable(
+                        keys = arrayOf(spot.id),
+                        state = rememberMarkerState(position = LatLng(spot.latitude, spot.longitude)),
+                        title = spot.title,
+                        snippet = spot.description
                     ) {
-                        Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+                        Box(
+                            modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
@@ -470,37 +472,66 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                     longitudeInput = String.format(Locale.US, "%.5f", latLng.longitude)
                 }
             ) {
-                // 1. Istniejący Marker aktywnie tworzonego/klikanego punktu
-                Marker(
+                // 1. Interaktywny marker aktywnie tworzonego punktu
+                // Dynamicznie wyciągamy emotkę z zaznaczonej opcji na żywo!
+                val activeEmoji = selectedCategory.substringBefore(" ")
+
+                com.google.maps.android.compose.MarkerComposable(
+                    keys = arrayOf(selectedCategory),
                     state = markerState,
-                    title = if (title.isBlank()) "Nowy punkt krytyczny" else title
-                )
+                    title = if (title.isBlank()) "Nowy punkt" else title,
+                    zIndex = 1f // Upewniamy się, że nasz aktywny punkt jest rysowany ZAWSZE na samej górze
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = CircleShape
+                            )
+                            .border(
+                                width = 3.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = activeEmoji, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
 
                 // 2. Wyświetlanie pozostałych punktów z unikalnymi emotkami w tle
                 spots.forEach { spot ->
-                    val emoji = spot.category.substringBefore(" ")
+                    key(spot.id) {
+                        val emoji = spot.category.substringBefore(" ")
 
-                    com.google.maps.android.compose.MarkerComposable(
-                        keys = arrayOf(spot.id),
-                        state = rememberMarkerState(position = LatLng(spot.latitude, spot.longitude)),
-                        title = spot.title,
-                        snippet = spot.description
-                    ) {
-                        Box(
-                            modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
-                                .size(36.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                    shape = CircleShape
+                        com.google.maps.android.compose.MarkerComposable(
+                            keys = arrayOf(spot.id),
+                            state = rememberMarkerState(
+                                position = LatLng(
+                                    spot.latitude,
+                                    spot.longitude
                                 )
-                                .border(
-                                    width = 1.5.dp,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
+                            ),
+                            title = spot.title,
+                            snippet = spot.description
                         ) {
-                            Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
+                            Box(
+                                modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                        shape = CircleShape
+                                    )
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }
