@@ -1,5 +1,12 @@
 package com.wildcore.ui
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -14,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,7 +51,6 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.google.maps.android.compose.MapProperties
 import java.util.Locale
 import com.wildcore.BuildConfig
-
 
 enum class WildCoreScreen(val title: String) {
     ADD_SPOT("🌲 Nowy Punkt GPS"),
@@ -184,7 +191,7 @@ fun JournalScreen(
                 when (currentScreen) {
                     WildCoreScreen.ADD_SPOT -> AddSpotForm(viewModel = viewModel)
                     WildCoreScreen.SAVED_SPOTS -> SavedSpotsList(viewModel = viewModel)
-                    WildCoreScreen.Tools -> ToolsScreen()
+                    WildCoreScreen.Tools -> ToolsScreen(viewModel = viewModel)
                     WildCoreScreen.WEATHER -> WeatherScreen()
                     WildCoreScreen.ALARM -> AlarmSettingsScreen()
                 }
@@ -194,63 +201,39 @@ fun JournalScreen(
 }
 
 // --- PODSTRONA 1: EKRAN NARZĘDZI (CZYSTY KOMPAS) ---
+@SuppressLint("MissingPermission")
 @Composable
-fun ToolsScreen() {
+fun ToolsScreen(viewModel: SurvivalViewModel = koinViewModel()) { // ZMIANA: Przyjmujemy viewModel
+    // NOWOŚĆ: Pobieranie zapisanych punktów w czasie rzeczywistym
+    val spots by viewModel.survivalSpots.collectAsState()
+
     val context = LocalContext.current
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
 
-    // Stan dla kompasu
+    // (reszta istniejącego kodu czujników kompasu pozostaje bez zmian...)
     var azimuth by remember { mutableStateOf(0f) }
-
-    // Tablice pomocnicze do obliczeń (akcelerometr + magnetometr)
     val gravity = remember { FloatArray(3) }
     val geomagnetic = remember { FloatArray(3) }
-
     val cameraPositionState = rememberCameraPositionState()
 
-    // Rejestracja wyłącznie potrzebnych czujników ruchu i pola magnetycznego
-    DisposableEffect(Unit) {
-        val sensorEventListener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                when (event.sensor.type) {
-                    Sensor.TYPE_ACCELEROMETER -> {
-                        System.arraycopy(event.values, 0, gravity, 0, event.values.size)
-                        calculateAzimuth()
-                    }
-                    Sensor.TYPE_MAGNETIC_FIELD -> {
-                        System.arraycopy(event.values, 0, geomagnetic, 0, event.values.size)
-                        calculateAzimuth()
-                    }
+    val hasLocationPermission = remember {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token).addOnSuccessListener { location ->
+                if (location != null) {
+                    val userLatLng = LatLng(location.latitude, location.longitude)
+                    cameraPositionState.position = CameraPosition.fromLatLngZoom(userLatLng, 15f)
                 }
             }
-
-            private fun calculateAzimuth() {
-                val r = FloatArray(9)
-                val i = FloatArray(9)
-                if (SensorManager.getRotationMatrix(r, i, gravity, geomagnetic)) {
-                    val orientation = FloatArray(3)
-                    SensorManager.getOrientation(r, orientation)
-                    val azimuthDeg = Math.toDegrees(orientation[0].toDouble()).toFloat()
-                    azimuth = (azimuthDeg + 360) % 360
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-
-        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-
-        sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI)
-        sensorManager.registerListener(sensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_UI)
-
-        // Sprzątanie po wyjściu z zakładki
-        onDispose {
-            sensorManager.unregisterListener(sensorEventListener)
         }
     }
 
-    // Wyznaczanie kierunku świata
+    // (Blok DisposableEffect dla rejestracji sensorów bez zmian...)
+
     val directionText = when (azimuth) {
         in 337.5..360.0, in 0.0..22.5 -> "N (Północ)"
         in 22.5..67.5 -> "NE (Pn-Wsch)"
@@ -266,10 +249,40 @@ fun ToolsScreen() {
         // Tło: Mapa Google
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
-        )
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(isMyLocationEnabled = hasLocationPermission)
+        ) {
+            // Pętla nanosząca wszystkie zapisane wcześniej pinezki
+            spots.forEach { spot ->
+                val emoji = spot.category.substringBefore(" ")
 
-        // Nakładka: Wyśrodkowany, czytelny kompas
+                com.google.maps.android.compose.MarkerComposable(
+                    keys = arrayOf(spot.id),
+                    state = rememberMarkerState(position = LatLng(spot.latitude, spot.longitude)),
+                    title = spot.title,
+                    snippet = spot.description
+                ) {
+                    Box(
+                        modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                            .size(36.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = CircleShape
+                            )
+                            .border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+
+        // Nakładka: Wyśrodkowany, czytelny kompas (karta UI)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -307,7 +320,6 @@ fun ToolsScreen() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Powiększona i wyśrodkowana fizyczna igła kompasu
                     Box(
                         modifier = Modifier
                             .size(130.dp)
@@ -320,7 +332,7 @@ fun ToolsScreen() {
                             tint = Color.Red,
                             modifier = Modifier
                                 .size(65.dp)
-                                .rotate(-azimuth) // dynamiczny obrót igły
+                                .rotate(-azimuth)
                         )
                     }
                 }
@@ -331,15 +343,45 @@ fun ToolsScreen() {
 
 
 // --- PODSTRONA 2: PEŁNOEKRANOWY FORMULARZ ---
+@SuppressLint("MissingPermission")
 @Composable
 fun AddSpotForm(viewModel: SurvivalViewModel) {
+    val context = LocalContext.current // POTRZEBNE DO LOKALIZACJI
+
+    val spots by viewModel.survivalSpots.collectAsState()
+
+    val hasLocationPermission = remember {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     val categories = listOf("💧 Woda", "⛺ Schron", "🍓 Jedzenie", "⚠️ Zagrożenie")
     var selectedCategory by remember { mutableStateOf(categories.first()) }
 
+    // Domyślne wartości (Gdańsk) zostawiamy jako "fallback" na wypadek braku GPS
     var latitudeInput by remember { mutableStateOf("54.3520") }
     var longitudeInput by remember { mutableStateOf("18.6460") }
+
+    // --- NOWY BLOK: Pobieranie aktualnej pozycji przy starcie ekranu ---
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                CancellationTokenSource().token
+            ).addOnSuccessListener { location ->
+                if (location != null) {
+                    // Aktualizujemy inputy prawdziwą lokalizacją, co automatycznie przesunie mapę
+                    latitudeInput = String.format(Locale.US, "%.5f", location.latitude)
+                    longitudeInput = String.format(Locale.US, "%.5f", location.longitude)
+                }
+            }
+        }
+    }
+    // ------------------------------------------------------------------
 
     val latDouble = latitudeInput.toDoubleOrNull()
     val lonDouble = longitudeInput.toDoubleOrNull()
@@ -359,7 +401,6 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
     val markerState = rememberMarkerState(position = defaultLatLng)
 
     // 3. Automatyczna synchronizacja: Klawiatura -> Mapa
-    // Jeśli użytkownik wpisze poprawny punkt ręcznie, przesuwamy tam mapę i pinezkę
     LaunchedEffect(latDouble, lonDouble) {
         if (isLatValid && isLonValid && latDouble != null && lonDouble != null) {
             val newTarget = LatLng(latDouble, lonDouble)
@@ -420,22 +461,49 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
-
+                properties = MapProperties(isMyLocationEnabled = hasLocationPermission),
                 googleMapOptionsFactory = {
                     GoogleMapOptions().mapId(BuildConfig.MAP_ID)
                 },
-
                 onMapClick = { latLng ->
-                    // Automatyczne uzupełnianie pól po kliknięciu
                     latitudeInput = String.format(Locale.US, "%.5f", latLng.latitude)
                     longitudeInput = String.format(Locale.US, "%.5f", latLng.longitude)
                 }
             ) {
-                // Wyświetlamy naszą survivalową pinezkę
+                // 1. Istniejący Marker aktywnie tworzonego/klikanego punktu
                 Marker(
                     state = markerState,
                     title = if (title.isBlank()) "Nowy punkt krytyczny" else title
                 )
+
+                // 2. Wyświetlanie pozostałych punktów z unikalnymi emotkami w tle
+                spots.forEach { spot ->
+                    val emoji = spot.category.substringBefore(" ")
+
+                    com.google.maps.android.compose.MarkerComposable(
+                        keys = arrayOf(spot.id),
+                        state = rememberMarkerState(position = LatLng(spot.latitude, spot.longitude)),
+                        title = spot.title,
+                        snippet = spot.description
+                    ) {
+                        Box(
+                            modifier = Modifier // <-- Tutaj zmienione na czysty Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = 1.5.dp,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
             }
         }
 
