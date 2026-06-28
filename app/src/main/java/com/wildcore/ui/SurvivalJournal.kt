@@ -554,10 +554,30 @@ fun AddSpotForm(viewModel: SurvivalViewModel) {
                 }
             ) {
                 if (isLatValid && isLonValid) {
-                    Marker(
+                    val currentEmoji = selectedCategory.substringBefore(" ")
+
+                    com.google.maps.android.compose.MarkerComposable(
+                        keys = arrayOf(selectedCategory), // 🔥 Klucz wymuszający odświeżenie ikony
                         state = markerState,
                         title = title.ifBlank { "Nowy punkt krytyczny" }
-                    )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = currentEmoji, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
                 }
 
                 spots.forEach { spot ->
